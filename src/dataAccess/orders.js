@@ -15,7 +15,7 @@ export default class OrdersDataAccess {
                     from: 'orderItems',
                     localField: '_id',
                     foreignField: 'orderId',
-                    as: 'orderitems'
+                    as: 'orderItems'
                 }
             },
             {
@@ -24,6 +24,20 @@ export default class OrdersDataAccess {
                     localField: 'userId',
                     foreignField: '_id',
                     as: 'userDetails'
+                }
+            },
+            {
+                $unwind: {
+                    path: "$orderItems",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'plates',
+                    localField: 'orderItems.plateId',
+                    foreignField: '_id',
+                    as: 'orderItems.itemDetails'
                 }
             },
             {
