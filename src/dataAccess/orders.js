@@ -1,0 +1,91 @@
+import { Mongo } from "../database/mongo.js";
+import { ObjectId } from "mongodb";
+
+
+
+const collectionName = 'orders'
+
+export default class OrdersDataAccess {
+    async getOrders(){
+        const result = await Mongo.db
+        .collection(collectionName)
+        .aggregate([
+            {
+                $lookup: {
+                    from: 'orderItems',
+                    localField: '_id',
+                    foreignField: 'orderId',
+                    as: 'orderitems'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'userDetails'
+                }
+            },
+            {
+                $project:{
+                    'userDetails.password': 0,
+                    'userDetails.salt': 0,
+                }
+            }
+        ])
+        .toArray();
+
+        return result;
+    }
+
+
+    async addOrder(orderData){
+        const { items, ...orderDataRest} = orderData;
+
+        orderDataRest.createdAt = new Date();
+        orderDataRest.pickupStatus = 'pending';
+        orderDataRest.userId = new ObjectId(orderDataRest.userId);
+
+        const newOrder = await Mongo.db
+        .collection(collectionName)
+        .insertOne(orderDataRest);
+
+        if(!newOrder.insertedId){
+            throw new Error('Order Cannot be inserted');
+        }
+
+        items.map((item) => {
+            item.plateId = new ObjectId(item.plateId);
+            item.orderId = new ObjectId(newOrder.insertedId);
+        });
+
+        const result = await Mongo.db
+        .collection('orderItems')
+        .insertMany(items);
+
+        return result;
+    }
+
+    async deleteOrder(orderId){
+        const result = await Mongo.db
+        .collection(collectionName)
+        .findOneAndDelete({_id: new ObjectId(orderId)})
+
+        return result;
+    }
+
+    async updateOrders(orderId, orderData){
+       
+        const result = await Mongo.db
+        .collection(collectionName)
+        .findOneAndUpdate(
+            { _id: new ObjectId(orderId) },
+            { $set: orderData },
+                
+            );
+            
+            return result;
+        }
+
+
+}
